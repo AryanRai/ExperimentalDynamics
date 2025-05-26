@@ -105,7 +105,7 @@ def variable_f0(time, mode, amplitude=1):
     match mode:
         case "sin":
             output = amplitude * np.sin(time)
-        case"absolute_sin":
+        case "absolute_sin":
             output = amplitude * abs(np.sin(time))
         case "e":
             output = amplitude * np.exp(time)
