@@ -96,6 +96,26 @@ x0 = np.concatenate((initial_position_body_1, initial_position_body_2, initial_p
 import scipy.optimize as opt
 
 x, _ = np.split(x0, 2)
+
+def variable_f0(time, mode, amplitude=1):
+    # Creates a time varying F_0. Amplitude (a) is for the coefficient of whichever mode is used
+    # Modes; sin: a * sin(t), e: a * exp(t), simple: a * t
+    # If entered mode is invalid defaults to sinusoidal
+
+    match mode:
+        case "sin":
+            output = amplitude * np.sin(time)
+        case"absolute_sin":
+            output = amplitude * abs(np.sin(time))
+        case "e":
+            output = amplitude * np.exp(time)
+        case "simple":
+            output = amplitude * time
+        case _:
+            output = amplitude * np.sin(time)
+
+    return output
+
 def optimiser(b):
     dx1, dy1, dx2, dy2, dtheta2, dx3, dy3 = b
     dq = np.array([dx1, dy1, dtheta1, dx2, dy2, dtheta2, dx3, dy3])
