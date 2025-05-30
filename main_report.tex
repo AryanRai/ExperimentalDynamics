@@ -1,0 +1,282 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{physics}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{float}
+
+% Adding a comprehensive preamble for compatibility
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\usepackage{siunitx} % For units
+\usepackage{booktabs} % For tables, if needed
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{noto} % Reliable font package for compatibility, loaded last
+
+\title{Dynamic Analysis of a Reciprocating Piston System with Flywheel}
+\author{Aryan Rai: [530362258] [contributions] \\
+        Xin Yu Lin: [520456446] [contributions]\\
+        Name: [SID] [contributions]\\
+        Name: [SID] [contributions]}
+\date{May 2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Abstract}
+
+TBD 
+
+%Brief Summary 
+
+\section{Introduction}
+
+The system investigated in this report is a reciprocating piston. The main components consists of a crank rod, connecting rod and piston. A sinusoidal pressure force is applied to the piston, causing its vertical displacement to drive the rotational motion of the crankshaft. This mechanism can be seen in practical applications such as engines- where the pressure force supplied to the piston is provided by processes such as combustion, and the resulting rotary motion can be used to drive an external component such as a wheel. In addition, this report will aim to derive equations of motion and a computational model for the reciprocating piston mechanism, which can be used to predict various dynamic behaviors and to simulate the impact of a flywheel extension on the system.  
+
+%system being investigated
+%it's novelty 
+%the motivation
+%aims and structure of the report 
+
+\section{Methodology}
+
+\subsection{Free Body Diagram}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width = 0.5\textwidth]{FBD Diagrams 2500.png}
+    \caption{Free Body Diagram for Reciprocating Piston (NOT TO SCALE)}
+\end{figure}
+
+
+\section*{1. Piston Kinematics}
+% Defining the displacement
+The displacement of the piston is determined by the geometry of the crank and connecting rod mechanism. Assuming the crank angle is \(\theta_c(t)\) (equivalent to `theta1` in the Python code), crank radius is \(L_1\) (code: `L1`), and connecting rod length is \(L_2\) (code: `L2`), the vertical displacement \(y_3\) of the piston, measured from top-dead-center (TDC), is:
+\begin{equation}
+    y_3(\theta_c) = L_1 \cos\theta_c + \sqrt{L_2^2 - L_1^2 \sin^2\theta_c}
+\end{equation}
+
+\subsection*{1.1 Velocity of the Piston}
+% Differentiating displacement
+Differentiating with respect to time:
+\begin{equation}
+    \dot{y}_3 = -L_1 \dot{\theta_c} \left[ \sin\theta_c + \frac{L_1 \sin\theta_c \cos\theta_c}{\sqrt{L_2^2 - L_1^2 \sin^2\theta_c}} \right]
+\end{equation}
+
+\subsection*{1.2 Acceleration}
+% Applying chain rule for acceleration
+\begin{equation}
+    \ddot{y}_3 = \left( \dv[2]{y_3}{\theta_c} \right) \dot{\theta_c}^2 + \left( \dv{y_3}{\theta_c} \right) \ddot{\theta_c}
+\end{equation}
+
+\section*{2. Force and Torque}
+\subsection*{2.1 Piston Force}
+% Defining sinusoidal pressure force
+The piston is driven by a pressure force that varies with both crank angle \(\theta_c\) and time \(t\). This force, \(F_{\text{piston}}(t, \theta_c)\), is given by:
+\begin{equation}
+    F_{\text{piston}}(t, \theta_c) = F_{0,\text{amp}} (1 + A_m \sin(\omega_f t)) \cos\theta_c
+\end{equation}
+where:
+\begin{itemize}
+    \item \(F_{0,\text{amp}}\) is the base amplitude of the pressure force (code: `F0_amplitude`).
+    \item \(A_m\) is the dimensionless amplitude of the force modulation (code: `force_modulation_amplitude`).
+    \item \(\omega_f\) is the angular frequency of the force variation (code: `force_variation_frequency`).
+    \item \(\theta_c\) is the crank angle (code: `theta1`). The term \(\cos\theta_c\) represents the sinusoidal variation of force with crank position.
+\end{itemize}
+
+\subsection*{2.2 Torque from the Piston}
+% Incorporating connecting rod angle
+The torque on the crankshaft, \(\tau_{\text{piston}}(t, \theta_c)\), due to the piston force, accounting for the connecting rod angle \(\phi\) where \(\sin\phi = \frac{L_1 \sin\theta_c}{L_2}\), is:
+\begin{equation}
+    \tau_{\text{piston}}(t, \theta_c) = F_{\text{piston}}(t, \theta_c) \cdot L_1 \sin\theta_c \cdot \frac{\sqrt{L_2^2 - L_1^2 \sin^2\theta_c}}{L_2}
+\end{equation}
+Substituting Eq. (4):
+\begin{equation}
+    \tau_{\text{piston}}(t, \theta_c) = \left[ F_{0,\text{amp}} (1 + A_m \sin(\omega_f t)) \cos\theta_c \right] \cdot L_1 \sin\theta_c \cdot \frac{\sqrt{L_2^2 - L_1^2 \sin^2\theta_c}}{L_2}
+\end{equation}
+
+\subsection*{2.3 Damping (Load) Torque}
+% Defining damping torque
+A damping torque opposes the crank's motion, proportional to its angular velocity. This is represented in the code by the parameter `k`.
+\begin{equation}
+    \tau_{\text{load}} = k \dot{\theta_c}
+\end{equation}
+where \( k \) is the damping coefficient (code: `k`).
+
+\section*{3. Equation of Motion with Flywheel}
+% Summing moments of inertia
+The total effective moment of inertia at the crankshaft includes the crankshaft's own inertia \(I_1\) (code: `I1`) and the flywheel's inertia \(I_{\text{flywheel}}\) (code: `I_flywheel`):
+\begin{equation}
+    I_{\text{total}} = I_1 + I_{\text{flywheel}}
+\end{equation}
+Note: The Python code implements a full multi-body dynamics model. This equation represents a simplified single-degree-of-freedom model for the crankshaft rotation, which is useful for conceptual understanding.
+
+% Applying Newton's second law
+Using Newton's second law for rotation for this simplified model:
+\begin{equation}
+    I_{\text{total}} \ddot{\theta_c} = \tau_{\text{piston}}(t, \theta_c) - \tau_{\text{load}}
+\end{equation}
+Substituting the expressions for torque:
+\begin{equation}
+    (I_1 + I_{\text{flywheel}}) \ddot{\theta_c} = \left[ F_{0,\text{amp}} (1 + A_m \sin(\omega_f t)) \cos\theta_c \cdot L_1 \sin\theta_c \cdot \frac{\sqrt{L_2^2 - L_1^2 \sin^2\theta_c}}{L_2} \right] - k \dot{\theta_c}
+\end{equation}
+
+\section*{4. Energy Analysis}
+\subsection*{4.1 Flywheel Kinetic Energy}
+% Flywheel energy
+The kinetic energy of the flywheel is:
+\begin{equation}
+    E_{\text{flywheel}} = \frac{1}{2} I_{\text{flywheel}} \dot{\theta_c}^2
+\end{equation}
+
+\subsection*{4.2 Total Kinetic Energy}
+% Total system energy
+For the simplified model, the total kinetic energy includes contributions from the crankshaft, flywheel, and the piston (mass \(m_3\), code: `m3`):
+\begin{equation}
+    E_{\text{total}} = \frac{1}{2} (I_1 + I_{\text{flywheel}}) \dot{\theta_c}^2 + \frac{1}{2} m_3 \dot{y}_3^2
+\end{equation}
+Note: The connecting rod's mass (\(m_2\)) and kinetic energy are handled by the full multi-body simulation in the Python code but are often simplified in analytical derivations. The crankshaft itself has mass \(m_1\).
+
+\subsection{Computational Approach}
+
+TBD - Aryan, Michael
+
+\section{Results} 
+
+%present sufficient figures, tables, calculations and discussion to analyse the system and reach conclusions. Graphs, plots and tables must be clearly captioned, have axis labels and legends and with specified units 
+
+The equations of motion and accompanying code can be used to answer questions pertaining to the dynamic behavior of the reciprocating engine if different variables are modified. 
+
+\subsubsection{Impact of Adjusting Linkage Geometry}
+%DONE ADD MICHAELS PART- changes to piston travel distance and rpm if r changes. not many changes if l changes. In a practcal sense, the length of r will be a key consideration. 
+% CODE TODO: Ensure SystemB.py can easily run simulations with different L1 and L2.
+% Plot piston displacement (y3) vs. time for different L1 values.
+% Plot crank angular velocity (theta1_dot) vs. time for different L1 values.
+% Plot piston displacement (y3) vs. time for different L2 values.
+
+% Placeholder for L1 variation plot (e.g., y3 vs. time)
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width = 0.8\textwidth]{placeholder_L1_effect.png}
+    \fbox{Placeholder: Plot showing effect of varying L1 (crank radius) on piston displacement}
+    \caption{Impact of Crank Radius (L1) on Piston Displacement}
+    \label{fig:l1_effect}
+\end{figure}
+
+% Placeholder for L2 variation plot (e.g., y3 vs. time)
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width = 0.8\textwidth]{placeholder_L2_effect.png}
+    \fbox{Placeholder: Plot showing effect of varying L2 (conrod length) on piston displacement}
+    \caption{Impact of Connecting Rod Length (L2) on Piston Displacement}
+    \label{fig:l2_effect}
+\end{figure}
+
+\subsubsection{Impact of Pressure Force Amplitude on Output Torque}
+% This section uses F0_amplitude (F_{0,amp} in LaTeX)
+
+Equation (5) was used to simulate the output torque in a full crank revolution at different values of pressure force \(F_{0,\text{amp}}\). As a result, it was determined that increasing the value of \(F_{0,\text{amp}}\) would proportionally increase the output torque. 
+% CODE TODO: Verify this plot can be generated. SystemB.py currently has F0_amplitude.
+% Set force_modulation_amplitude = 0 for this specific test to isolate F0_amplitude effect.
+% Calculate and plot torque_on_crank = Q[2] (generalized force for theta1) vs. theta1 for different F0_amplitude values.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width = \textwidth]{2500torqueforcgraph.jpg}
+    \caption{Output Torque at Different \(F_{0,\text{amp}}\) Magnitudes (Constant Pressure Force)}
+    \label{fig:f0_amp_torque}
+\end{figure}
+
+\subsubsection{Impact of Varying Pressure Force}
+% This section uses F0_amplitude, force_modulation_amplitude (A_m), and force_variation_frequency (\omega_f)
+% CODE TODO: This is now implemented in SystemB.py.
+% Plot crank angular velocity (theta1_dot) vs. time with and without force variation (i.e., A_m = 0 vs. A_m > 0).
+% Plot torque_on_crank vs. time with force variation.
+
+% Placeholder for varying F0 effect on angular velocity
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width = 0.8\textwidth]{placeholder_varying_F0_omega.png}
+    \fbox{Placeholder: Plot showing effect of time-varying F0 on crankshaft angular velocity}
+    \caption{Impact of Time-Varying Pressure Force (\(A_m > 0\)) on Crankshaft Angular Velocity}
+    \label{fig:varying_f0_omega}
+\end{figure}
+
+% Placeholder for varying F0 effect on torque
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width = 0.8\textwidth]{placeholder_varying_F0_torque.png}
+    \fbox{Placeholder: Plot showing effect of time-varying F0 on output torque}
+    \caption{Impact of Time-Varying Pressure Force (\(A_m > 0\)) on Output Torque}
+    \label{fig:varying_f0_torque}
+\end{figure}
+
+
+\subsubsection{Impact of Flywheel Extension}
+%ARYAN SIMULATIONS QUALITATIVE DISCUSSION
+%With and without flywheel 
+% CODE TODO: Run simulations with I_flywheel = 0 and I_flywheel > 0.
+% Plot crank angular velocity (theta1_dot) vs. time for both cases.
+% Plot torque_on_crank vs. time for both cases.
+% Consider calculating and comparing standard deviation of angular velocity/torque.
+
+% Placeholder for flywheel effect on angular velocity
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width = 0.8\textwidth]{placeholder_flywheel_omega.png}
+    \fbox{Placeholder: Plot comparing crankshaft angular velocity with and without flywheel}
+    \caption{Impact of Flywheel (\(I_{\text{flywheel}}\)) on Crankshaft Angular Velocity Stability}
+    \label{fig:flywheel_omega}
+\end{figure}
+
+% Placeholder for flywheel effect on torque
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width = 0.8\textwidth]{placeholder_flywheel_torque.png}
+    \fbox{Placeholder: Plot comparing output torque with and without flywheel}
+    \caption{Impact of Flywheel (\(I_{\text{flywheel}}\)) on Output Torque Smoothing}
+    \label{fig:flywheel_torque}
+\end{figure}
+
+\subsubsection{Impact of Friction}
+% CODE TODO: The current model uses a damping coefficient 'k' for theta1 (crank rotation).
+% This represents a form of viscous friction/load on the crankshaft.
+% To discuss piston/wall friction, a new force term opposing y3_dot would need to be added to Q[7].
+Friction between the piston and the surrounding walls, as well as within the joints, affects the system's efficiency. The current model includes a damping term \(k \dot{\theta_c}\) on the crankshaft, representing a viscous load. Piston-cylinder friction, if significant, would introduce a force opposing \(\dot{y}_3\) and further reduce output torque.
+
+% Placeholder for friction discussion (conceptual or comparative plot if model extended)
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width = 0.7\textwidth]{placeholder_friction_concept.png}
+    \fbox{Placeholder: Conceptual diagram of friction forces or comparative plot if modeled}
+    \caption{Conceptual Impact of Additional Frictional Forces}
+    \label{fig:friction_concept}
+\end{figure}
+
+\subsubsection{Impact of Misalignment}
+%theory only? 
+% CODE TODO: Modeling misalignment is complex and likely beyond the scope of the current SystemB.py structure.
+% This would require 3D kinematics and dynamics, or significant simplification.
+% For the report, this can remain a theoretical discussion.
+Misalignment of components, such as the crankshaft axis not being perfectly perpendicular to the piston's line of motion, can introduce additional forces, vibrations, and wear. Analyzing these effects typically requires more complex 3D dynamic models. Such misalignments can lead to uneven loading and reduced component life.
+
+% Placeholder for misalignment discussion (conceptual diagram)
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width = 0.7\textwidth]{placeholder_misalignment_concept.png}
+    \fbox{Placeholder: Conceptual diagram illustrating potential misalignments}
+    \caption{Conceptual Illustration of Component Misalignment Effects}
+    \label{fig:misalignment_concept}
+\end{figure}
+
+\section{Conclusions}
+
+\section{Appendix}
+
+\section{References}
+
+\end{document}
