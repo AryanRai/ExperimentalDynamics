@@ -19,60 +19,19 @@ import IPython.display as disp
 m1, m2, m3 = 1, 2, 0.5
 L1, L2 = 0.5, 1.5
 I1, I2 = 0.5, 1.5
-# Add flywheel parameters
-m_flywheel = 2.0  # Mass of the flywheel
-I_flywheel = 1.0  # Moment of inertia of the flywheel
-
-# Parameters for time-varying F0
-F0_amplitude = 50  # Base amplitude of the pressure force
-force_modulation_amplitude = 0.5  # e.g., 0.5 means 50% variation
-force_variation_frequency = 1.0  # rad/s for the sinusoidal variation of F0
-
-k = 1 # Damping coefficient (formerly c_damping, now k)
+F0 = 50  # Base force amplitude
+k = 1
 g = 9.81
-# If = 0.9  # Inertia of the flywheel -> This is now I_flywheel
-# c_damping = 0.7  # Damping coefficient for the flywheel load -> This is now k
+If = 0.9  # Inertia of the flywheel
+c_damping = 0.7  # Damping coefficient for the flywheel load
 
-F0_MODULATION_MODE = "current_sin"  # Options: "current_sin", "sin", "absolute_sin", "exp_positive", "exp_negative", "linear_positive", "linear_negative", "constant"
-
-# Function to calculate the time-varying modulation factor for F0
-def calculate_force_modulation_factor(time, mode, amplitude, frequency):
-    """ 
-    Calculates the modulation factor for F0 based on the selected mode.
-    This factor is typically force_modulation_amplitude * some_function(frequency * time).
-    The final F0 magnitude used in Q will be F0_amplitude * (1 + factor).
-    """
-    scaled_time = frequency * time
-
-    match mode:
-        case "current_sin": # Your existing sinusoidal variation
-            factor = amplitude * np.sin(scaled_time)
-        case "sin": # Standard sine wave modulation
-            factor = amplitude * np.sin(scaled_time)
-        case "absolute_sin": # Absolute sine wave modulation (always positive modulation)
-            factor = amplitude * np.abs(np.sin(scaled_time))
-        case "exp_positive": # Exponentially increasing modulation
-            factor = amplitude * (np.exp(scaled_time/frequency * 0.1) -1) # Scaled to start near 0
-        case "exp_negative": # Exponentially decaying modulation
-            factor = amplitude * (np.exp(-scaled_time/frequency * 0.1) -1) # Scaled to start near 0 and go negative
-        case "linear_positive": # Linearly increasing modulation
-            factor = amplitude * (scaled_time/frequency * 0.1) # Scaled rate
-        case "linear_negative": # Linearly decreasing modulation
-            factor = amplitude * (-scaled_time/frequency * 0.1) # Scaled rate
-        case "constant": # No time variation in modulation, just a constant offset factor
-            factor = amplitude 
-        case _:
-            print(f"Warning: Invalid F0_MODULATION_MODE '{mode}'. Defaulting to 'current_sin'.")
-            factor = amplitude * np.sin(scaled_time) # Default to original behavior
-    return factor
+# Simple time-varying parameters (optional)
+time_varying = True  # Set to False for constant force
+force_amplitude_variation = 0.3  # 30% variation
+force_frequency = 1.0  # rad/s
 
 # %%
 t = sp.symbols('t')
-
-# Define time-varying F0
-# F0_t = F0_amplitude * (1 + force_modulation_amplitude * sp.sin(force_variation_frequency * t)) # This will be replaced
-current_F0_base_magnitude = sp.symbols('current_F0_base_magnitude') # New symbolic placeholder
-
 x1, x2, y1, y2, theta1, theta2, x3, y3 = dynamicsymbols('x1 x2 y1 y2 theta1 theta2 x3 y3')
 q = sp.Matrix([x1, y1, theta1, x2, y2, theta2, x3, y3])
 dq = q.diff(t)
@@ -83,11 +42,17 @@ x_com_3 = sp.Matrix([x3, y3])
 
 R = lambda theta: sp.Matrix([[sp.cos(theta), -sp.sin(theta)], [sp.sin(theta), sp.cos(theta)]])
 
-# Update mass matrix to include flywheel inertia
-M = np.diag([m1, m1, I1 + I_flywheel, m2, m2, I2, m3, m3])  # Added I_flywheel to I1
+M = np.diag([m1, m1, I1 + If, m2, m2, I2, m3, m3])
 W = np.linalg.inv(M)
-# Update Q to use the new current_F0_base_magnitude placeholder
-Q = sp.Matrix([0, -m1*g, -k*theta1.diff(t), 0, -m2*g, 0, 0, -m3*g + current_F0_base_magnitude * sp.cos(theta1)])
+
+# Simple time-varying force or constant force
+if time_varying:
+    # F(t) = F0 * (1 + amplitude * sin(frequency * t)) * cos(theta1)
+    F_t = F0 * (1 + force_amplitude_variation * sp.sin(force_frequency * t))
+    Q = sp.Matrix([0, -m1*g, -k*theta1.diff(t) - c_damping*theta1.diff(t), 0, -m2*g, 0, 0, -m3*g + F_t * sp.cos(theta1)])
+else:
+    # Constant force
+    Q = sp.Matrix([0, -m1*g, -k*theta1.diff(t) - c_damping*theta1.diff(t), 0, -m2*g, 0, 0, -m3*g + F0 * sp.cos(theta1)])
 
 # %%
 i_cap = sp.Matrix([1, 0])
@@ -118,13 +83,13 @@ dJ = dC.jacobian(q)
 JWJT = J @ W @ J.T
 RHS = -dJ @ dq - J @ W @ Q - 1 * C - 1 * dC
 
-JWJT_fn = sp.lambdify(args=(q, dq), expr=JWJT)
-RHS_fn = sp.lambdify(args=(q, dq, current_F0_base_magnitude), expr=RHS)
+JWJT_fn = sp.lambdify(args=(q, dq, t), expr=JWJT)
+RHS_fn = sp.lambdify(args=(q, dq, t), expr=RHS)
 C_fn = sp.lambdify(args=(q, dq), expr=C)    
 J_fn = sp.lambdify(args=(q, dq), expr=J)   
 dC_fn = sp.lambdify(args=(q, dq), expr=dC)  
 dJ_fn = sp.lambdify(args=(q, dq), expr=dJ)
-Q_fn = sp.lambdify(args=(q, dq, current_F0_base_magnitude), expr=Q)
+Q_fn = sp.lambdify(args=(q, dq, t), expr=Q)
 
 # %%
 dtheta1 = 0.5
@@ -183,21 +148,14 @@ def piston_engine(t, state):
 
     q, dq = np.split(state, 2)
 
-    # Calculate the current F0 base magnitude based on time and mode
-    modulation_factor = calculate_force_modulation_factor(time=t, 
-                                                          mode=F0_MODULATION_MODE, 
-                                                          amplitude=force_modulation_amplitude, 
-                                                          frequency=force_variation_frequency)
-    actual_F0_base_magnitude = F0_amplitude * (1 + modulation_factor)
-
-    # Solve for lambda 
-    lam = np.linalg.solve(JWJT_fn(q,dq), RHS_fn(q, dq, actual_F0_base_magnitude))
+    # Solve for lambda - now includes time for time-varying force
+    lam = np.linalg.solve(JWJT_fn(q, dq, t), RHS_fn(q, dq, t))
 
     # Solve for constraint forces 
     Qhat = J_fn(q, dq).T @ lam
 
     # Calculate accelerations
-    ddq = W @ (Q_fn(q, dq, actual_F0_base_magnitude) + Qhat)
+    ddq = W @ (Q_fn(q, dq, t) + Qhat)
     ddq = ddq.flatten()
 
     return np.concatenate((dq, ddq))
@@ -281,7 +239,7 @@ class CircleBody:
 import matplotlib
 matplotlib.use('TkAgg')  # Use TkAgg backend for better compatibility
 from matplotlib.animation import FuncAnimation
-# from IPython.display import HTML # No longer needed for plt.show()
+# from IPython.display import HTML
 
 # Global variables for stroke counting
 stroke_count = 0
@@ -326,11 +284,10 @@ param_string = (
     f"Parameters:\n"
     f"m1={m1:.2f}, m2={m2:.2f}, m3={m3:.2f}\n"
     f"L1={L1:.2f}, L2={L2:.2f}\n"
-    f"I1={I1:.2f}, I2={I2:.2f}\n"
-    f"m_fly={m_flywheel:.2f}, I_fly={I_flywheel:.2f}\n"
-    f"F0_amp={F0_amplitude:.2f}, F_mod_amp={force_modulation_amplitude:.2f}\n"
-    f"F_var_freq={force_variation_frequency:.2f}, F_mode='{F0_MODULATION_MODE}'\n"
-    f"k_damp={k:.2f}, g={g:.2f}"
+    f"I1={I1:.2f}, I2={I2:.2f}, If={If:.2f}\n"
+    f"F0={F0:.2f}, k={k:.2f}, c_damp={c_damping:.2f}\n"
+    f"Time varying: {time_varying}\n"
+    f"Force variation: {force_amplitude_variation:.1f} at {force_frequency:.1f} rad/s"
 )
 
 def init():
@@ -338,7 +295,7 @@ def init():
     ax.set_ylim(-0.6, 2.1) # Re-apply limits after clearing
     ax.set_xlim(-0.6, 0.6)
     ax.set_aspect('equal')
-    ax.set_title("t=0.00s | Rot: 0.0 | Strokes: 0", fontsize=12) # Simplified title
+    ax.set_title("t=0.00s | Rot: 0.0 | Strokes: 0", fontsize=12)
 
     # Add parameter text to the figure
     fig.text(0.02, 0.02, param_string, fontsize=8, va='bottom', ha='left', family='monospace')
@@ -363,7 +320,7 @@ def animate(i):
             stroke_count += 1
         previous_dy3_sign = current_dy3_sign
     
-    ax.set_title(f"t={sol.t[i]:.2f}s | Rot: {rotations:.1f} | Strokes: {stroke_count}", fontsize=12) # Simplified title
+    ax.set_title(f"t={sol.t[i]:.2f}s | Rot: {rotations:.1f} | Strokes: {stroke_count}", fontsize=12)
 
     for box in boxes:
         box.update(i)
@@ -377,7 +334,7 @@ dt = sol.t[1] - sol.t[0]
 anim = FuncAnimation(fig, animate, frames=len(sol.t), init_func=init, blit=True, interval=1000*dt)
 
 # Save the animation to a file first
-anim.save('piston_engine_modified.gif', writer='pillow', fps=30) # Changed filename
+anim.save('piston_engine_simple.gif', writer='pillow', fps=30)
 
 # Then display the animation
 plt.show()
